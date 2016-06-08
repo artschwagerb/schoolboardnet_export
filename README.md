@@ -1,5 +1,5 @@
 # schoolboardnet_export
-Export Agenda and Attachments from [SchoolBoardNet](SchoolBoardNet|http://schoolboard.net/)
+Export Agenda and Attachments from [SchoolBoardNet](http://schoolboard.net/)
 
 # Virtual Environment
 Best Practices... You should be creating a new virtualenv for these python libraries.
