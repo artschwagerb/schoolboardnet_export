@@ -1,20 +1,22 @@
+import os 
+import sys
+
+import mechanize
 from bs4 import BeautifulSoup
-import requests
+import urllib2 
+import cookielib
 
 from ConfigParser import SafeConfigParser
-
 from termcolor import colored
 
-import os 
-
-import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 
+current_path = os.path.dirname(os.path.realpath(__file__))
+
+# import settings
 parser = SafeConfigParser()
 parser.read('settings.ini')
-
-current_path = os.path.dirname(os.path.realpath(__file__))
 
 settings_download_links = True
 settings_download_content = True
@@ -22,6 +24,22 @@ settings_domain = parser.get('general', 'domain')
 settings_attachment_url = parser.get('general', 'attachment_url')
 settings_agenda_filename = parser.get('general', 'agenda_filename')
 settings_events_url = parser.get('general', 'events_url')
+settings_username = parser.get('auth', 'username')
+settings_password = parser.get('auth', 'password')
+
+# create browser environment and cookies
+cj = cookielib.CookieJar()
+br = mechanize.Browser()
+br.set_cookiejar(cj)
+br.open(settings_events_url)
+
+#login to website
+br.form = list(br.forms())[2]
+br.form['name'] = settings_username
+br.form['pass'] = settings_password
+br.submit()
+
+print br.response().read()
 
 def get_valid_string(str):
 	import string
@@ -30,9 +48,9 @@ def get_valid_string(str):
 	return ''.join(c for c in str if c in valid_chars)
 
 def get_events(event_list_url,get_sub_pages):
-	r  = requests.get(event_list_url)
+	br.open(event_list_url)
 
-	data = r.text
+	data = br.response().read()
 
 	soup = BeautifulSoup(data, "html.parser")
 
@@ -54,18 +72,22 @@ def get_events(event_list_url,get_sub_pages):
 		get_node(settings_domain+link_url)
 
 	if get_sub_pages:
-		sub_pages = soup.find_all('li', attrs={'class':'pager-item'})
+		print "Looking for next page..."
+		next_page = soup.find('li', attrs={'class':'pager-next'})
 
-		for page in sub_pages:
-			page_url = page.find('a').get('href')
+		if next_page:
+			page_url = next_page.find('a').get('href')
+			print "Found next page: %s" % (page_url)
 			#print page_url
-			get_events(settings_domain+page_url,get_sub_pages=False)
+			get_events(settings_domain+page_url,get_sub_pages=True)
+		else:
+			print "No more pages..."
 	
 
 def get_node(node_url):
-	r  = requests.get(node_url)
+	br.open(node_url)
 
-	data = r.text
+	data = br.response().read()
 
 	soup = BeautifulSoup(data, "html.parser")
 
@@ -110,14 +132,8 @@ def get_node(node_url):
 
 					if not os.path.exists(download_path):
 						#print "Downloading: %s" % (link_text)
-						r = requests.get(link_url, stream=True)
-						if r.status_code == 200:
-							with open(download_path, 'wb') as f:
-								for chunk in r:
-									f.write(chunk)
-							print colored("SUCCESS: %s" % (link_text),'green')
-						else:
-							print colored("FAILURE: %s" % (link_text),'red')
+						r = br.retrieve(link_url, download_path)
+						print colored("SUCCESS: %s" % (link_text),'green')
 					else:
 						print colored("EXISTS: %s" % (link_text),'yellow')
 			except:
